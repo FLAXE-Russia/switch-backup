@@ -1,0 +1,33 @@
+#!/bin/bash
+
+#ip_addresses=("*ipaddres1*" "*ipadress2*")
+#username=" "
+read -p "Введите ip адрес: " ip_addresses
+
+LOGFILE=./add-shh-mikrotik.txt
+log(){
+   message="$(date +"%d-%m-%y %T") $@"
+   echo $message
+   echo $message >>$LOGFILE
+}
+
+# Выполняем запросы для каждого IP-адреса
+for ip in "${ip_addresses[@]}"
+do
+        ## Проверяем наличие каталога под временные файлы tmp
+        #if ! [ -d ./tmp ]; then
+        #    mkdir ./tmp
+        #fi
+
+        #Проверяем наличие каталога с папкой Ip коммутатора если нет создаем....
+        if ! [ -d ./${ip} ]; then
+            mkdir ./${ip}
+        fi
+read -p "Введите имя пользователя ${ip}: " username
+#Создаем пользователя для бекапов
+ ssh ${username}@${ip} "/user add name=*имя пользователя под которым будут работать ssh ключи и резервные копии* group=full password=*сложный пароль*"
+#Копируем файл сертификата на микротик
+scp /root/.ssh/id_rsa.pub  ${username}@${ip}:/ansible.pub
+#Добавляем ключ к пользователю
+ssh ${username}@${ip} "/user ssh-keys import user=backup public-key-file=ansible.pub"
+done
