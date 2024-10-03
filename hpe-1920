@@ -1,0 +1,65 @@
+#!/bin/bash
+
+ip_addresses=("*ip-address*")
+username=" "
+password=" "
+
+LOGFILE=./name-log.txt
+log(){
+   message="$(date +"%d-%m-%y %T") $@"
+   echo $message
+   echo $message >>$LOGFILE
+}
+
+# Выполняем запросы для каждого IP-адреса
+for ip in "${ip_addresses[@]}"
+do
+    log "начало попытки сохранения конфигурации ${ip}"
+    for idx in $(seq 5);.
+    do
+        # Проверяем наличие каталога под временные файлы tmp
+        if ! [ -d ./tmp ]; then
+            mkdir ./tmp
+        fi
+
+        #Проверяем наличие каталога с папкой Ip коммутатора если нет создаем....
+        if ! [ -d ./${ip} ]; then
+            mkdir ./${ip}
+        fi
+
+        token=$(echo "$(date +%s)000")
+        #data=$(date +%F)
+        jar="./tmp/hpe_${ip}.jar"
+        tmp="./tmp/status.json"
+
+        echo "HPE 1920 ${ip}"
+        echo "Выполняем запрос аутентификации для получения куки"
+        # Выполняем запрос аутентификации для получения куки
+        curl --noproxy "*" "http://${ip}/htdocs/login/login.lua" --data-raw "username=${username}&password=${password}" -c "${jar}" &> ./tmp/autch-1920-curl-${ip}.txt
+
+        # Выполняем запрос с использованием куки
+        echo "ждем 15 сек"
+        sleep 15
+        curl --noproxy "*" --url "http://${ip}/htdocs/lua/ajax/file_upload_ajax.lua?protocol=6" -F "file_type_sel[]=config" -F "http_token=${token}" -b "${jar}"
+        curl --noproxy "*" -L --url "http://${ip}/htdocs/pages/base/file_http_download.lsp?name=startup-config&file=/mnt/download/startup-config&token=${token}" -b "${jar}" > "./${ip}/startup-config"
+        curl --noproxy "*" --url "http://${ip}/htdocs/lua/ajax/keep_alive.lua?_=${token}" -b "${jar}"
+        echo "отправляем статус пометки на удаления файла предварительно ожидаем 5 секунд"
+        sleep 5
+        curl --noproxy "*" --url "http://${ip}/htdocs/pages/base/file_http_download.lsp?name=startup-config&file=/mnt/download/startup-config&token=${token}&remove=true" -b "${jar}" 2>/dev/null > "${tmp}"
+        echo "записали в файл статус:"
+        cat ${tmp}
+        echo ""
+        curl --noproxy "*" --url "http://${ip}/htdocs/pages/main/logout.lsp" -b "${jar}"
+        sleep 2
+        echo ""
+
+        is_removed=$(cat "${tmp}" | grep -Fe '"status": "true"')
+        rm -f "${jar}" "${tmp}"
+        if [[ -n "${is_removed}" ]]; then
+            log "Конфигурация успешно сохранена ${ip}"
+            break
+        fi
+        log "Конфигурация не сохранена ${ip}"
+    done
+done
+rm -r ./tmp/autch-1920-curl-*.txt
