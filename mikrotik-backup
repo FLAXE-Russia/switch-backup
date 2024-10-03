@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Список IP-адресов
+ip_addresses=("*ip-adresss*")
+username=" "
+backupname=" "
+
+LOGFILE=./backup-mikrotik-successfully.txt
+log(){
+   message="$(date +"%d-%m-%y %T") $@"
+   echo $message
+   echo $message >>$LOGFILE
+}
+
+# Выполняем запросы для каждого IP-адреса
+for ip in "${ip_addresses[@]}"
+do
+        ## Проверяем наличие каталога под временные файлы tmp
+        #if ! [ -d ./tmp ]; then
+        #    mkdir ./tmp
+        #fi
+
+        #Проверяем наличие каталога с папкой Ip коммутатора если нет создаем....
+        if ! [ -d ./${ip} ]; then
+            mkdir ./${ip}
+        fi
+  log "Начала копирования ${ip}"
+ssh ${username}@${ip} "export file=${backupname}"
+sftp ${username}@${ip}:/${backupname}.r* ./${ip}/${backupname}.rsc
+ssh ${username}@${ip} "file remove ${backupname}.rsc";
+#убираем лишние строки из конфига, чтоб при отправки в гит фиксировались реальные изменения
+tail -n +2 ./${ip}/${backupname}.rsc > ./${ip}/${backupname}.rsc.tmp && mv ./${ip}/${backupname}.rsc.tmp ./${ip}/${backupname}.rsc
+log "Конфигурация сохранена ${ip}"
+done
