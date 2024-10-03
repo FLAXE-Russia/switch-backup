@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Список IP-адресов
+ip_addresses=("*ip-addres*")
+LOGFILE=./backup-aruba.txt
+log(){
+   message="$(date +"%d-%m-%y %T") $@"
+   echo $message
+   echo $message >>$LOGFILE
+}
+
+
+# Выполняем запросы для каждого IP-адреса
+for ip in "${ip_addresses[@]}"
+do
+    log "начало попытки сохранения конфигурации ${ip}"
+    id_com=curl -x '' -v --url 'http://$ip/' -i 2>/dev/null | grep -Poe '/\w+/hpe'
+    # Проверяем наличие каталога под временные файлы tmp
+    if ! [ -d ./tmp ]; then
+    mkdir ./tmp
+    fi
+.....
+    echo "ARUBA ${ip}"
+    # Выполняем запрос аутентификации для получения куки в *test* коментарий убирать вместе с *
+    curl -x '' "http://$ip/$id_com/hpe/config/system.xml?action=login&user=*ваш логин*&password=*ваш пароль*&ssd=true" -c "./tmp/aruba_${ip}.jar"
+
+    # Проверяем каталог под конфигурацию коммутатора
+    if ! [ -d ./${ip} ]; then
+    mkdir ./${ip}
+    fi
+    # Выполняем запрос с использованием куки
+    curl -x '' "http://$ip/$id_com/hpe/http_download?action=2&ssd=4" -b "./tmp/aruba_${ip}.jar" > "./${ip}/running-config"
+    log "Конфигурация успешно сохранена ${ip}"
+    curl --url "http://${ip}/hpe/config/log_off_page.htm" -b "./tmp/hpe_${ip}.jar"
+done
+rm -r ./tmp/aruba_*.jar
